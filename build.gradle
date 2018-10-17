@@ -1,14 +1,25 @@
 plugins {
-    id 'kotlin-multiplatform' version '1.3.0-rc-116'
+    id 'kotlin-multiplatform' version '1.3.0-rc-146'
 }
 repositories {
     maven { url 'http://dl.bintray.com/kotlin/kotlin-eap' }
+    maven { url "http://dl.bintray.com/kotlin/ktor" }
     mavenCentral()
+    jcenter()
 }
+def ktor_version = '1.0.0-beta-1'
+def logback_version = '1.2.3'
 kotlin {
     targets {
         fromPreset(presets.jvm, 'jvm')
-        fromPreset(presets.js, 'js')
+        fromPreset(presets.js, 'js') {
+            [tasks.getByName(compilations.main.compileKotlinTaskName), tasks.getByName(compilations.test.compileKotlinTaskName)]*.kotlinOptions {
+                languageVersion = "1.3"
+                moduleKind = "umd"
+                sourceMap = true
+                metaInfo = true
+            }
+        }
     }
     sourceSets {
         commonMain {
@@ -25,6 +36,9 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
+                implementation "io.ktor:ktor-server-netty:$ktor_version"
+                implementation "io.ktor:ktor-html-builder:$ktor_version"
+                implementation "ch.qos.logback:logback-classic:$logback_version"
             }
         }
         jvmTest {
@@ -44,4 +58,33 @@ kotlin {
             }
         }
     }
+}
+
+def webFolder = new File(project.buildDir, "../src/jsMain/web")
+def jsCompilations = kotlin.targets.js.compilations
+
+task populateWebFolder(dependsOn: [jsMainClasses]) {
+    doLast {
+        copy {
+            from jsCompilations.main.output
+            from kotlin.sourceSets.jsMain.resources.srcDirs
+            jsCompilations.test.runtimeDependencyFiles.each {
+                if (it.exists() && !it.isDirectory()) {
+                    from zipTree(it.absolutePath).matching { include '*.js' }
+                }
+            }
+            into webFolder
+        }
+    }
+}
+
+jsJar.dependsOn(populateWebFolder)
+
+task run(type: JavaExec, dependsOn: [jvmMainClasses, jsJar]) {
+    main = "sample.SampleJvmKt"
+    classpath { [
+            kotlin.targets.jvm.compilations.main.output.files,
+            configurations.jvmRuntimeClasspath,
+    ] }
+    args = []
 }
