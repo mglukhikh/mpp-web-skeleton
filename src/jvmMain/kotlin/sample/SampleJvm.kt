@@ -17,7 +17,7 @@ actual object Platform {
     actual val name: String = "JVM"
 }
 
-fun main(args: Array<String>) {
+fun main() {
     embeddedServer(Netty, port = 8080, host = "127.0.0.1") {
         val currentDir = File(".").absoluteFile
         environment.log.info("Current directory: $currentDir")
@@ -35,6 +35,9 @@ fun main(args: Array<String>) {
         routing {
             get("/") {
                 call.respondHtml {
+                    head {
+                        title("Hello from Ktor!")
+                    }
                     body {
                         +"${hello()} from Ktor. Check me value: ${Sample().checkMe()}"
                         div {
